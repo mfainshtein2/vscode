@@ -15,7 +15,7 @@ import { Dimension, Builder } from 'vs/base/browser/builder';
 import { ArrayNavigator } from 'vs/base/common/iterator';
 import { Disposable, IDisposable, dispose } from 'vs/base/common/lifecycle';
 import { KeyMod, KeyCode } from 'vs/base/common/keyCodes';
-import { SideBySideEditorInput, EditorOptions, EditorInput } from 'vs/workbench/common/editor';
+import { SideBySideEditorInput, EditorOptions, EditorInput, PREFERENCES_EDITOR_ID } from 'vs/workbench/common/editor';
 import { BaseEditor } from 'vs/workbench/browser/parts/editor/baseEditor';
 import { ResourceEditorModel } from 'vs/workbench/common/editor/resourceEditorModel';
 import { IEditorControl, Position, Verbosity } from 'vs/platform/editor/common/editor';
@@ -105,7 +105,7 @@ export class DefaultPreferencesEditorInput extends ResourceEditorInput {
 
 export class PreferencesEditor extends BaseEditor {
 
-	public static readonly ID: string = 'workbench.editor.preferencesEditor';
+	public static readonly ID: string = PREFERENCES_EDITOR_ID;
 
 	private defaultSettingsEditorContextKey: IContextKey<boolean>;
 	private focusSettingsContextKey: IContextKey<boolean>;
@@ -350,7 +350,7 @@ export class PreferencesEditor extends BaseEditor {
 					"filter": { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
 					"durations" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
 					"counts" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
-					"requestCount" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" }
+					"requestCount" : { "classification": "SystemMetaData", "purpose": "FeatureInsight", "isMeasurement": true }
 				}
 			*/
 			this.telemetryService.publicLog('defaultSettings.filter', data);
@@ -618,7 +618,7 @@ class PreferencesRenderersController extends Disposable {
 				} else {
 					/* __GDPR__
 						"defaultSettings.searchError" : {
-							"message": { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
+							"message": { "classification": "CallstackOrException", "purpose": "FeatureInsight" },
 							"filter": { "classification": "SystemMetaData", "purpose": "FeatureInsight" }
 						}
 					*/
@@ -717,10 +717,10 @@ class PreferencesRenderersController extends Disposable {
 			"defaultSettingsActions.copySetting" : {
 				"userConfigurationKeys" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
 				"query" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
-				"nlpIndex" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
+				"nlpIndex" : { "classification": "SystemMetaData", "purpose": "FeatureInsight", "isMeasurement": true },
 				"groupId" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
-				"displayIdx" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
-				"editableSide" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" }
+				"displayIdx" : { "classification": "SystemMetaData", "purpose": "FeatureInsight", "isMeasurement": true },
+				"editableSide" : { "classification": "SystemMetaData", "purpose": "FeatureInsight", "isMeasurement": true }
 			}
 		*/
 		this.telemetryService.publicLog('defaultSettingsActions.copySetting', data);

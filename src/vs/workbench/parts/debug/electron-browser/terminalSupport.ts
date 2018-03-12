@@ -43,9 +43,13 @@ export class TerminalSupport {
 		terminalService.showPanel(true);
 
 		const command = this.prepareCommand(args, configurationService);
-		t.sendText(command, true);
 
-		return TPromise.as(void 0);
+		return new TPromise((resolve, error) => {
+			setTimeout(_ => {
+				t.sendText(command, true);
+				resolve(void 0);
+			}, 500);
+		});
 	}
 
 	private static isBusy(t: ITerminalInstance): boolean {
@@ -56,12 +60,17 @@ export class TerminalSupport {
 					const result = cp.spawnSync('wmic', ['process', 'get', 'ParentProcessId']);
 					if (result.stdout) {
 						const pids = result.stdout.toString().split('\r\n');
-						return pids.some(p => parseInt(p) === t.processId);
+						if (!pids.some(p => parseInt(p) === t.processId)) {
+							return false;
+						}
 					}
 				} else {
-					const result = cp.spawnSync('/usr/bin/pgrep', ['-P', String(t.processId)]);
+					const result = cp.spawnSync('/usr/bin/pgrep', ['-lP', String(t.processId)]);
 					if (result.stdout) {
-						return result.stdout.toString().trim().length > 0;
+						const r = result.stdout.toString().trim();
+						if (r.length === 0 || r.indexOf(' tmux') >= 0) { // ignore 'tmux'; see #43683
+							return false;
+						}
 					}
 				}
 			}

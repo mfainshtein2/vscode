@@ -324,7 +324,7 @@ export class FolderSettingsActionItem extends BaseActionItem {
 		this.labelElement = DOM.$('.action-title');
 		this.detailsElement = DOM.$('.action-details');
 		this.dropDownElement = DOM.$('.dropdown-icon.octicon.octicon-triangle-down.hide');
-		this.anchorElement = DOM.$('a.action-label', {
+		this.anchorElement = DOM.$('a.action-label.folder-settings', {
 			role: 'button',
 			'aria-haspopup': 'true',
 			'tabindex': '0'
@@ -728,8 +728,8 @@ export class FloatingClickWidget extends Widget implements IOverlayWidget {
 	public render() {
 		this._domNode = DOM.$('.floating-click-widget');
 		this._register(attachStylerCallback(this.themeService, { buttonBackground, buttonForeground }, colors => {
-			this._domNode.style.backgroundColor = colors.buttonBackground;
-			this._domNode.style.color = colors.buttonForeground;
+			this._domNode.style.backgroundColor = colors.buttonBackground ? colors.buttonBackground.toString() : null;
+			this._domNode.style.color = colors.buttonForeground ? colors.buttonForeground.toString() : null;
 		}));
 
 		DOM.append(this._domNode, DOM.$('')).textContent = this.label;
@@ -883,7 +883,7 @@ registerThemingParticipant((theme: ITheme, collector: ICssStyleCollector) => {
 				outline-style: solid;
 				border-bottom: none;
 				padding-bottom: 0;
-				outline-offset: 3px;
+				outline-offset: 2px;
 			}
 
 			.settings-tabs-widget > .monaco-action-bar .action-item .action-label:not(.checked):hover {

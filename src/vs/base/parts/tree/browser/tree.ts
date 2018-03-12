@@ -60,7 +60,7 @@ export interface ITree {
 	/**
 	 * Sets DOM focus on the tree.
 	 */
-	DOMFocus(): void;
+	domFocus(): void;
 
 	/**
 	 * Returns whether the tree has DOM focus.
@@ -70,13 +70,18 @@ export interface ITree {
 	/**
 	 * Removes DOM focus from the tree.
 	 */
-	DOMBlur(): void;
+	domBlur(): void;
 
 	/**
 	 * Refreshes an element.
 	 * Provide no arguments and it will refresh the input element.
 	 */
 	refresh(element?: any, recursive?: boolean): WinJS.Promise;
+
+	/**
+	 * Updates an element's width.
+	 */
+	updateWidth(element: any): void;
 
 	/**
 	 * Expands an element.
@@ -666,6 +671,7 @@ export interface ITreeConfiguration {
 	filter?: IFilter;
 	sorter?: ISorter;
 	accessibilityProvider?: IAccessibilityProvider;
+	styler?: ITreeStyler;
 }
 
 export interface ITreeOptions extends ITreeStyles {
@@ -673,6 +679,7 @@ export interface ITreeOptions extends ITreeStyles {
 	showTwistie?: boolean;
 	indentPixels?: number;
 	verticalScrollMode?: ScrollbarVisibility;
+	horizontalScrollMode?: ScrollbarVisibility;
 	alwaysFocused?: boolean;
 	autoExpandSingleChildren?: boolean;
 	useShadows?: boolean;
@@ -680,6 +687,10 @@ export interface ITreeOptions extends ITreeStyles {
 	ariaLabel?: string;
 	keyboardSupport?: boolean;
 	preventRootFocus?: boolean;
+}
+
+export interface ITreeStyler {
+	style(styles: ITreeStyles): void;
 }
 
 export interface ITreeStyles {

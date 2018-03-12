@@ -14,7 +14,7 @@ import * as platform from 'vs/base/common/platform';
 import { IJSONSchema, IJSONSchemaSnippet } from 'vs/base/common/jsonSchema';
 import { IWorkspaceFolder } from 'vs/platform/workspace/common/workspace';
 import { IConfig, IRawAdapter, IAdapterExecutable, INTERNAL_CONSOLE_OPTIONS_SCHEMA, IConfigurationManager } from 'vs/workbench/parts/debug/common/debug';
-import { IExtensionDescription } from 'vs/platform/extensions/common/extensions';
+import { IExtensionDescription } from 'vs/workbench/services/extensions/common/extensions';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { ICommandService } from 'vs/platform/commands/common/commands';
 
@@ -40,8 +40,8 @@ export class Adapter {
 			}
 
 			// try deprecated command based extension API
-			if (this.rawAdapter.adapterExecutableCommand && root) {
-				return this.commandService.executeCommand<IAdapterExecutable>(this.rawAdapter.adapterExecutableCommand, root.uri.toString()).then(ad => {
+			if (this.rawAdapter.adapterExecutableCommand) {
+				return this.commandService.executeCommand<IAdapterExecutable>(this.rawAdapter.adapterExecutableCommand, root ? root.uri.toString() : undefined).then(ad => {
 					return this.verifyAdapterDetails(ad, verifyAgainstFS);
 				});
 			}
@@ -214,6 +214,11 @@ export class Adapter {
 				type: ['string', 'null'],
 				default: null,
 				description: nls.localize('debugPrelaunchTask', "Task to run before debug session starts.")
+			};
+			properties['postDebugTask'] = {
+				type: ['string', 'null'],
+				default: null,
+				description: nls.localize('debugPostDebugTask', "Task to run after debug session ends.")
 			};
 			properties['internalConsoleOptions'] = INTERNAL_CONSOLE_OPTIONS_SCHEMA;
 

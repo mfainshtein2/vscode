@@ -35,7 +35,7 @@ suite('RipgrepParser', () => {
 	}
 
 	function parseInputStrings(inputChunks: string[]): ISerializedFileMatch[] {
-		return parseInput(inputChunks.map(chunk => new Buffer(chunk)));
+		return parseInput(inputChunks.map(chunk => Buffer.from(chunk)));
 	}
 
 	function parseInput(inputChunks: Buffer[]): ISerializedFileMatch[] {

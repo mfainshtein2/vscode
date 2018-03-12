@@ -42,7 +42,7 @@ import { ILifecycleService, LifecyclePhase } from 'vs/platform/lifecycle/common/
 import { getBaseLabel } from 'vs/base/common/labels';
 import { assign } from 'vs/base/common/objects';
 import { Readable } from 'stream';
-import { IWriteFileOptions } from 'vs/base/node/extfs';
+import { IWriteFileOptions, IStatAndLink } from 'vs/base/node/extfs';
 import { Schemas } from 'vs/base/common/network';
 
 export interface IEncodingOverride {
@@ -165,7 +165,7 @@ export class FileService implements IFileService {
 
 	private registerListeners(): void {
 		this.toDispose.push(this.contextService.onDidChangeWorkbenchState(() => {
-			if (this.lifecycleService.phase === LifecyclePhase.Running) {
+			if (this.lifecycleService.phase >= LifecyclePhase.Running) {
 				this.setupFileWatching();
 			}
 		}));
@@ -815,7 +815,12 @@ export class FileService implements IFileService {
 
 	private doMoveOrCopyFile(sourcePath: string, targetPath: string, keepCopy: boolean, overwrite: boolean): TPromise<boolean /* exists */> {
 
-		// 1.) check if target exists
+		// 1.) validate operation
+		if (isParent(targetPath, sourcePath, !isLinux)) {
+			return TPromise.wrapError<boolean>(new Error('Unable to move/copy when source path is parent of target path'));
+		}
+
+		// 2.) check if target exists
 		return pfs.exists(targetPath).then(exists => {
 			const isCaseRename = sourcePath.toLowerCase() === targetPath.toLowerCase();
 			const isSameFile = sourcePath === targetPath;
@@ -825,7 +830,7 @@ export class FileService implements IFileService {
 				return TPromise.wrapError<boolean>(new FileOperationError(nls.localize('fileMoveConflict', "Unable to move/copy. File already exists at destination."), FileOperationResult.FILE_MOVE_CONFLICT));
 			}
 
-			// 2.) make sure target is deleted before we move/copy unless this is a case rename of the same file
+			// 3.) make sure target is deleted before we move/copy unless this is a case rename of the same file
 			let deleteTargetPromise = TPromise.wrap<void>(void 0);
 			if (exists && !isCaseRename) {
 				if (isEqualOrParent(sourcePath, targetPath, !isLinux /* ignorecase */)) {
@@ -837,7 +842,7 @@ export class FileService implements IFileService {
 
 			return deleteTargetPromise.then(() => {
 
-				// 3.) make sure parents exists
+				// 4.) make sure parents exists
 				return pfs.mkdirp(paths.dirname(targetPath)).then(() => {
 
 					// 4.) copy/move
@@ -912,8 +917,8 @@ export class FileService implements IFileService {
 	private toStatResolver(resource: uri): TPromise<StatResolver> {
 		const absolutePath = this.toAbsolutePath(resource);
 
-		return pfs.stat(absolutePath).then(stat => {
-			return new StatResolver(resource, stat.isDirectory(), stat.mtime.getTime(), stat.size, this.options.verboseLogging ? this.options.errorLogger : void 0);
+		return pfs.statLink(absolutePath).then(({ isSymbolicLink, stat }) => {
+			return new StatResolver(resource, isSymbolicLink, stat.isDirectory(), stat.mtime.getTime(), stat.size, this.options.verboseLogging ? this.options.errorLogger : void 0);
 		});
 	}
 
@@ -1146,25 +1151,21 @@ export class FileService implements IFileService {
 }
 
 export class StatResolver {
-	private resource: uri;
-	private isDirectory: boolean;
-	private mtime: number;
 	private name: string;
 	private etag: string;
-	private size: number;
-	private errorLogger: (error: Error | string) => void;
 
-	constructor(resource: uri, isDirectory: boolean, mtime: number, size: number, errorLogger?: (error: Error | string) => void) {
+	constructor(
+		private resource: uri,
+		private isSymbolicLink: boolean,
+		private isDirectory: boolean,
+		private mtime: number,
+		private size: number,
+		private errorLogger?: (error: Error | string) => void
+	) {
 		assert.ok(resource && resource.scheme === Schemas.file, `Invalid resource: ${resource}`);
 
-		this.resource = resource;
-		this.isDirectory = isDirectory;
-		this.mtime = mtime;
 		this.name = getBaseLabel(resource);
 		this.etag = etag(size, mtime);
-		this.size = size;
-
-		this.errorLogger = errorLogger;
 	}
 
 	public resolve(options: IResolveFileOptions): TPromise<IFileStat> {
@@ -1173,6 +1174,7 @@ export class StatResolver {
 		const fileStat: IFileStat = {
 			resource: this.resource,
 			isDirectory: this.isDirectory,
+			isSymbolicLink: this.isSymbolicLink,
 			name: this.name,
 			etag: this.etag,
 			size: this.size,
@@ -1223,6 +1225,7 @@ export class StatResolver {
 			flow.parallel(files, (file: string, clb: (error: Error, children: IFileStat) => void) => {
 				const fileResource = uri.file(paths.resolve(absolutePath, file));
 				let fileStat: fs.Stats;
+				let isSymbolicLink = false;
 				const $this = this;
 
 				flow.sequence(
@@ -1235,11 +1238,12 @@ export class StatResolver {
 					},
 
 					function stat(this: any): void {
-						fs.stat(fileResource.fsPath, this);
+						extfs.statLink(fileResource.fsPath, this);
 					},
 
-					function countChildren(this: any, fsstat: fs.Stats): void {
-						fileStat = fsstat;
+					function countChildren(this: any, statAndLink: IStatAndLink): void {
+						fileStat = statAndLink.stat;
+						isSymbolicLink = statAndLink.isSymbolicLink;
 
 						if (fileStat.isDirectory()) {
 							extfs.readdir(fileResource.fsPath, (error, result) => {
@@ -1254,6 +1258,7 @@ export class StatResolver {
 						const childStat: IFileStat = {
 							resource: fileResource,
 							isDirectory: fileStat.isDirectory(),
+							isSymbolicLink,
 							name: file,
 							mtime: fileStat.mtime.getTime(),
 							etag: etag(fileStat),

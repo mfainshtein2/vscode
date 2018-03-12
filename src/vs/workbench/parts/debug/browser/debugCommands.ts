@@ -6,42 +6,40 @@
 import * as nls from 'vs/nls';
 import { KeyCode, KeyMod } from 'vs/base/common/keyCodes';
 import { TPromise } from 'vs/base/common/winjs.base';
-import severity from 'vs/base/common/severity';
 import { List } from 'vs/base/browser/ui/list/listWidget';
 import * as errors from 'vs/base/common/errors';
 import { KeybindingsRegistry } from 'vs/platform/keybinding/common/keybindingsRegistry';
 import { IListService } from 'vs/platform/list/browser/listService';
-import { IMessageService } from 'vs/platform/message/common/message';
 import { IWorkspaceContextService, WorkbenchState } from 'vs/platform/workspace/common/workspace';
-import { IDebugService, IEnablement, CONTEXT_BREAKPOINTS_FOCUSED, CONTEXT_WATCH_EXPRESSIONS_FOCUSED, CONTEXT_VARIABLES_FOCUSED, EDITOR_CONTRIBUTION_ID, IDebugEditorContribution, CONTEXT_IN_DEBUG_MODE, CONTEXT_NOT_IN_DEBUG_REPL, CONTEXT_EXPRESSION_SELECTED } from 'vs/workbench/parts/debug/common/debug';
+import { IDebugService, IEnablement, CONTEXT_BREAKPOINTS_FOCUSED, CONTEXT_WATCH_EXPRESSIONS_FOCUSED, CONTEXT_VARIABLES_FOCUSED, EDITOR_CONTRIBUTION_ID, IDebugEditorContribution, CONTEXT_IN_DEBUG_MODE, CONTEXT_NOT_IN_DEBUG_REPL, CONTEXT_EXPRESSION_SELECTED, CONTEXT_BREAKPOINT_SELECTED } from 'vs/workbench/parts/debug/common/debug';
 import { Expression, Variable, Breakpoint, FunctionBreakpoint } from 'vs/workbench/parts/debug/common/debugModel';
 import { IExtensionsViewlet, VIEWLET_ID as EXTENSIONS_VIEWLET_ID } from 'vs/workbench/parts/extensions/common/extensions';
 import { IViewletService } from 'vs/workbench/services/viewlet/browser/viewlet';
 import { ICodeEditor } from 'vs/editor/browser/editorBrowser';
-import { CommandsRegistry } from 'vs/platform/commands/common/commands';
 import { MenuRegistry, MenuId } from 'vs/platform/actions/common/actions';
 import { IWorkbenchEditorService } from 'vs/workbench/services/editor/common/editorService';
 import { EditorContextKeys } from 'vs/editor/common/editorContextKeys';
 import { ContextKeyExpr } from 'vs/platform/contextkey/common/contextkey';
 import { openBreakpointSource } from 'vs/workbench/parts/debug/browser/breakpointsView';
+import { INotificationService } from 'vs/platform/notification/common/notification';
+import { InputFocusedContext } from 'vs/platform/workbench/common/contextkeys';
 
 export function registerCommands(): void {
 
 	KeybindingsRegistry.registerCommandAndKeybindingRule({
 		id: 'debug.toggleBreakpoint',
 		weight: KeybindingsRegistry.WEIGHT.workbenchContrib(5),
-		when: CONTEXT_BREAKPOINTS_FOCUSED,
+		when: ContextKeyExpr.and(CONTEXT_BREAKPOINTS_FOCUSED, InputFocusedContext.toNegated()),
 		primary: KeyCode.Space,
 		handler: (accessor) => {
 			const listService = accessor.get(IListService);
 			const debugService = accessor.get(IDebugService);
-			const focused = listService.lastFocusedList;
-
-			// Tree only
-			if (!(focused instanceof List)) {
-				const tree = focused;
-				const element = <IEnablement>tree.getFocus();
-				debugService.enableOrDisableBreakpoints(!element.enabled, element).done(null, errors.onUnexpectedError);
+			const list = listService.lastFocusedList;
+			if (list instanceof List) {
+				const focused = <IEnablement[]>list.getFocusedElements();
+				if (focused && focused.length) {
+					debugService.enableOrDisableBreakpoints(!focused[0].enabled, focused[0]).done(null, errors.onUnexpectedError);
+				}
 			}
 		}
 	});
@@ -112,17 +110,18 @@ export function registerCommands(): void {
 	KeybindingsRegistry.registerCommandAndKeybindingRule({
 		id: 'debug.removeBreakpoint',
 		weight: KeybindingsRegistry.WEIGHT.workbenchContrib(),
-		when: CONTEXT_BREAKPOINTS_FOCUSED,
+		when: ContextKeyExpr.and(CONTEXT_BREAKPOINTS_FOCUSED, CONTEXT_BREAKPOINT_SELECTED.toNegated()),
 		primary: KeyCode.Delete,
 		mac: { primary: KeyMod.CtrlCmd | KeyCode.Backspace },
 		handler: (accessor) => {
 			const listService = accessor.get(IListService);
 			const debugService = accessor.get(IDebugService);
-			const focused = listService.lastFocusedList;
+			const list = listService.lastFocusedList;
 
 			// Tree only
-			if (!(focused instanceof List)) {
-				const element = focused.getFocus();
+			if (list instanceof List) {
+				const focused = list.getFocusedElements();
+				const element = focused.length ? focused[0] : undefined;
 				if (element instanceof Breakpoint) {
 					debugService.removeBreakpoints(element.getId()).done(null, errors.onUnexpectedError);
 				} else if (element instanceof FunctionBreakpoint) {
@@ -156,7 +155,7 @@ export function registerCommands(): void {
 		handler: (accessor, launchUri: string) => {
 			const manager = accessor.get(IDebugService).getConfigurationManager();
 			if (accessor.get(IWorkspaceContextService).getWorkbenchState() === WorkbenchState.EMPTY) {
-				accessor.get(IMessageService).show(severity.Info, nls.localize('noFolderDebugConfig', "Please first open a folder in order to do advanced debug configuration."));
+				accessor.get(INotificationService).info(nls.localize('noFolderDebugConfig', "Please first open a folder in order to do advanced debug configuration."));
 				return TPromise.as(null);
 			}
 			const launch = manager.getLaunches().filter(l => l.uri.toString() === launchUri).pop() || manager.selectedConfiguration.launch;
@@ -175,7 +174,10 @@ export function registerCommands(): void {
 	});
 
 	const COLUMN_BREAKPOINT_COMMAND_ID = 'editor.debug.action.toggleColumnBreakpoint';
-	CommandsRegistry.registerCommand({
+	KeybindingsRegistry.registerCommandAndKeybindingRule({
+		weight: KeybindingsRegistry.WEIGHT.workbenchContrib(),
+		primary: KeyMod.Shift | KeyCode.F9,
+		when: EditorContextKeys.textFocus,
 		id: COLUMN_BREAKPOINT_COMMAND_ID,
 		handler: (accessor) => {
 			const debugService = accessor.get(IDebugService);

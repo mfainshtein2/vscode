@@ -6,14 +6,12 @@
 import * as nls from 'vs/nls';
 import { Action } from 'vs/base/common/actions';
 import * as lifecycle from 'vs/base/common/lifecycle';
-import severity from 'vs/base/common/severity';
 import { TPromise } from 'vs/base/common/winjs.base';
-import { ICodeEditor } from 'vs/editor/browser/editorBrowser';
+import { ICodeEditor, isCodeEditor } from 'vs/editor/browser/editorBrowser';
 import { IKeybindingService } from 'vs/platform/keybinding/common/keybinding';
 import { ICommandService } from 'vs/platform/commands/common/commands';
 import { IWorkspaceContextService, WorkbenchState } from 'vs/platform/workspace/common/workspace';
 import { IFileService } from 'vs/platform/files/common/files';
-import { IMessageService } from 'vs/platform/message/common/message';
 import { IDebugService, State, IProcess, IThread, IEnablement, IBreakpoint, IStackFrame, IDebugEditorContribution, EDITOR_CONTRIBUTION_ID, IExpression, REPL_ID, ProcessState }
 	from 'vs/workbench/parts/debug/common/debug';
 import { Variable, Expression, Thread, Breakpoint, Process } from 'vs/workbench/parts/debug/common/debugModel';
@@ -22,6 +20,10 @@ import { IPanelService } from 'vs/workbench/services/panel/common/panelService';
 import { IWorkbenchEditorService } from 'vs/workbench/services/editor/common/editorService';
 import { TogglePanelAction } from 'vs/workbench/browser/panel';
 import { IQuickOpenService } from 'vs/platform/quickOpen/common/quickOpen';
+import { INotificationService } from 'vs/platform/notification/common/notification';
+import { CollapseAction } from 'vs/workbench/browser/viewlet';
+import { ITree } from 'vs/base/parts/tree/browser/tree';
+import { first } from 'vs/base/common/arrays';
 
 export abstract class AbstractDebugAction extends Action {
 
@@ -77,7 +79,7 @@ export class ConfigureAction extends AbstractDebugAction {
 	constructor(id: string, label: string,
 		@IDebugService debugService: IDebugService,
 		@IKeybindingService keybindingService: IKeybindingService,
-		@IMessageService private messageService: IMessageService,
+		@INotificationService private notificationService: INotificationService,
 		@IWorkspaceContextService private contextService: IWorkspaceContextService
 	) {
 		super(id, label, 'debug-action configure', debugService, keybindingService);
@@ -99,7 +101,7 @@ export class ConfigureAction extends AbstractDebugAction {
 
 	public run(event?: any): TPromise<any> {
 		if (this.contextService.getWorkbenchState() === WorkbenchState.EMPTY) {
-			this.messageService.show(severity.Info, nls.localize('noFolderDebugConfig', "Please first open a folder in order to do advanced debug configuration."));
+			this.notificationService.info(nls.localize('noFolderDebugConfig', "Please first open a folder in order to do advanced debug configuration."));
 			return TPromise.as(null);
 		}
 
@@ -115,7 +117,8 @@ export class StartAction extends AbstractDebugAction {
 	constructor(id: string, label: string,
 		@IDebugService debugService: IDebugService,
 		@IKeybindingService keybindingService: IKeybindingService,
-		@IWorkspaceContextService private contextService: IWorkspaceContextService
+		@IWorkspaceContextService private contextService: IWorkspaceContextService,
+		@IWorkbenchEditorService private editorService: IWorkbenchEditorService
 	) {
 		super(id, label, 'debug-action start', debugService, keybindingService);
 
@@ -125,7 +128,23 @@ export class StartAction extends AbstractDebugAction {
 	}
 
 	public run(): TPromise<any> {
-		const launch = this.debugService.getConfigurationManager().selectedConfiguration.launch;
+		const configurationManager = this.debugService.getConfigurationManager();
+		let launch = configurationManager.selectedConfiguration.launch;
+		if (!launch) {
+			const activeEditor = this.editorService.getActiveEditor();
+			const launches = configurationManager.getLaunches();
+			if (isCodeEditor(activeEditor)) {
+				const resource = activeEditor.input.getResource();
+				const root = this.contextService.getWorkspaceFolder(resource);
+				launch = configurationManager.getLaunch(root.uri);
+			}
+			if (!launch) {
+				launch = first(launches, l => !!l.getConfigurationNames().length, launches.length ? launches[0] : undefined);
+			}
+
+			configurationManager.selectConfiguration(launch);
+		}
+
 		return this.debugService.startDebugging(launch, undefined, this.isNoDebug());
 	}
 
@@ -836,5 +855,17 @@ export class ReverseContinueAction extends AbstractDebugAction {
 		const process = this.debugService.getViewModel().focusedProcess;
 		return super.isEnabled(state) && state === State.Stopped &&
 			process && process.session.capabilities.supportsStepBack;
+	}
+}
+
+export class ReplCollapseAllAction extends CollapseAction {
+	constructor(viewer: ITree, private toFocus: { focus(): void; }) {
+		super(viewer, true, undefined);
+	}
+
+	public run(event?: any): TPromise<any> {
+		return super.run(event).then(() => {
+			this.toFocus.focus();
+		});
 	}
 }

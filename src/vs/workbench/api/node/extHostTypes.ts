@@ -1311,14 +1311,30 @@ export class ProcessExecution implements vscode.ProcessExecution {
 export class ShellExecution implements vscode.ShellExecution {
 
 	private _commandLine: string;
+	private _command: string | vscode.ShellQuotedString;
+	private _args: (string | vscode.ShellQuotedString)[];
 	private _options: vscode.ShellExecutionOptions;
 
-	constructor(commandLine: string, options?: vscode.ShellExecutionOptions) {
-		if (typeof commandLine !== 'string') {
-			throw illegalArgument('commandLine');
+	constructor(commandLine: string, options?: vscode.ShellExecutionOptions);
+	constructor(command: string | vscode.ShellQuotedString, args: (string | vscode.ShellQuotedString)[], options?: vscode.ShellExecutionOptions);
+	constructor(arg0: string | vscode.ShellQuotedString, arg1?: vscode.ShellExecutionOptions | (string | vscode.ShellQuotedString)[], arg2?: vscode.ShellExecutionOptions) {
+		if (Array.isArray(arg1)) {
+			if (!arg0) {
+				throw illegalArgument('command can\'t be undefined or null');
+			}
+			if (typeof arg0 !== 'string' && typeof arg0.value !== 'string') {
+				throw illegalArgument('command');
+			}
+			this._command = arg0;
+			this._args = arg1 as (string | vscode.ShellQuotedString)[];
+			this._options = arg2;
+		} else {
+			if (typeof arg0 !== 'string') {
+				throw illegalArgument('commandLine');
+			}
+			this._commandLine = arg0;
+			this._options = arg1;
 		}
-		this._commandLine = commandLine;
-		this._options = options;
 	}
 
 	get commandLine(): string {
@@ -1332,6 +1348,25 @@ export class ShellExecution implements vscode.ShellExecution {
 		this._commandLine = value;
 	}
 
+	get command(): string | vscode.ShellQuotedString {
+		return this._command;
+	}
+
+	set command(value: string | vscode.ShellQuotedString) {
+		if (typeof value !== 'string' && typeof value.value !== 'string') {
+			throw illegalArgument('command');
+		}
+		this._command = value;
+	}
+
+	get args(): (string | vscode.ShellQuotedString)[] {
+		return this._args;
+	}
+
+	set args(value: (string | vscode.ShellQuotedString)[]) {
+		this._args = value || [];
+	}
+
 	get options(): vscode.ShellExecutionOptions {
 		return this._options;
 	}
@@ -1339,6 +1374,12 @@ export class ShellExecution implements vscode.ShellExecution {
 	set options(value: vscode.ShellExecutionOptions) {
 		this._options = value;
 	}
+}
+
+export enum ShellQuoting {
+	Escape = 1,
+	Strong = 2,
+	Weak = 3
 }
 
 export enum TaskScope {
@@ -1544,6 +1585,18 @@ export enum TreeItemCollapsibleState {
 	Expanded = 2
 }
 
+export class ThemeIcon {
+	static readonly File = new ThemeIcon('file');
+
+	static readonly Folder = new ThemeIcon('folder');
+
+	readonly id: string;
+
+	private constructor(id: string) {
+		this.id = id;
+	}
+}
+
 export class ThemeColor {
 	id: string;
 	constructor(id: string) {
@@ -1656,6 +1709,49 @@ export enum FileType {
 	File = 0,
 	Dir = 1,
 	Symlink = 2
+}
+
+//#endregion
+
+//#region folding api
+
+export class FoldingRangeList {
+
+	ranges: FoldingRange[];
+
+	constructor(ranges: FoldingRange[]) {
+		this.ranges = ranges;
+	}
+}
+
+export class FoldingRange {
+
+	startLine: number;
+
+	endLine: number;
+
+	type?: FoldingRangeType | string;
+
+	constructor(startLine: number, endLine: number, type?: FoldingRangeType | string) {
+		this.startLine = startLine;
+		this.endLine = endLine;
+		this.type = type;
+	}
+}
+
+export enum FoldingRangeType {
+	/**
+	 * Folding range for a comment
+	 */
+	Comment = 'comment',
+	/**
+	 * Folding range for a imports or includes
+	 */
+	Imports = 'imports',
+	/**
+	 * Folding range for a region (e.g. `#region`)
+	 */
+	Region = 'region'
 }
 
 //#endregion

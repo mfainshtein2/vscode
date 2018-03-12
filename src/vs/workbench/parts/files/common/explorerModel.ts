@@ -23,7 +23,7 @@ export class Model {
 	private _roots: FileStat[];
 	private _listener: IDisposable;
 
-	constructor( @IWorkspaceContextService private contextService: IWorkspaceContextService) {
+	constructor(@IWorkspaceContextService private contextService: IWorkspaceContextService) {
 		const setRoots = () => this._roots = this.contextService.getWorkspace().folders.map(folder => {
 			const root = new FileStat(folder.uri, undefined);
 			root.name = folder.name;
@@ -75,15 +75,17 @@ export class FileStat implements IFileStat {
 	public mtime: number;
 	public etag: string;
 	private _isDirectory: boolean;
+	private _isSymbolicLink: boolean;
 	public children: FileStat[];
 	public parent: FileStat;
 
 	public isDirectoryResolved: boolean;
 
-	constructor(resource: URI, public root: FileStat, isDirectory?: boolean, name: string = getPathLabel(resource), mtime?: number, etag?: string) {
+	constructor(resource: URI, public root: FileStat, isSymbolicLink?: boolean, isDirectory?: boolean, name: string = getPathLabel(resource), mtime?: number, etag?: string) {
 		this.resource = resource;
 		this.name = name;
 		this.isDirectory = !!isDirectory;
+		this._isSymbolicLink = !!isSymbolicLink;
 		this.etag = etag;
 		this.mtime = mtime;
 
@@ -92,6 +94,10 @@ export class FileStat implements IFileStat {
 		}
 
 		this.isDirectoryResolved = false;
+	}
+
+	public get isSymbolicLink(): boolean {
+		return this._isSymbolicLink;
 	}
 
 	public get isDirectory(): boolean {
@@ -123,7 +129,7 @@ export class FileStat implements IFileStat {
 	}
 
 	public static create(raw: IFileStat, root: FileStat, resolveTo?: URI[]): FileStat {
-		const stat = new FileStat(raw.resource, root, raw.isDirectory, raw.name, raw.mtime, raw.etag);
+		const stat = new FileStat(raw.resource, root, raw.isSymbolicLink, raw.isDirectory, raw.name, raw.mtime, raw.etag);
 
 		// Recursively add children if present
 		if (stat.isDirectory) {
@@ -316,7 +322,7 @@ export class NewStatPlaceholder extends FileStat {
 	private directoryPlaceholder: boolean;
 
 	constructor(isDirectory: boolean, root: FileStat) {
-		super(URI.file(''), root, false, '');
+		super(URI.file(''), root, false, false, '');
 
 		this.id = NewStatPlaceholder.ID++;
 		this.isDirectoryResolved = isDirectory;

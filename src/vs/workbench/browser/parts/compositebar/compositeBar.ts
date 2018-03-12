@@ -24,7 +24,7 @@ export interface ICompositeBarOptions {
 	icon: boolean;
 	storageId: string;
 	orientation: ActionsOrientation;
-	composites: { id: string, name: string }[];
+	composites: { id: string, name: string, order: number }[];
 	colors: ICompositeBarColors;
 	overflowActionSize: number;
 	getActivityAction: (compositeId: string) => ActivityAction;
@@ -79,6 +79,27 @@ export class CompositeBar implements ICompositeBar {
 
 	public get onDidContextMenu(): Event<MouseEvent> {
 		return this._onDidContextMenu.event;
+	}
+
+	public addComposite(compositeData: { id: string; name: string, order: number }): void {
+		if (this.options.composites.filter(c => c.id === compositeData.id).length) {
+			return;
+		}
+		let i = 0;
+		while (i < this.options.composites.length && this.options.composites[i].order < compositeData.order) {
+			i++;
+		}
+		this.options.composites.push(compositeData);
+		this.pin(compositeData.id, true, i);
+	}
+
+	public removeComposite(id: string): void {
+		if (this.options.composites.filter(c => c.id === id).length === 0) {
+			return;
+		}
+
+		this.options.composites = this.options.composites.filter(c => c.id !== id);
+		this.unpin(id);
 	}
 
 	public activateComposite(id: string): void {
@@ -180,6 +201,7 @@ export class CompositeBar implements ICompositeBar {
 			ariaLabel: nls.localize('activityBarAriaLabel', "Active View Switcher"),
 			animated: false,
 		});
+		this.toDispose.push(this.compositeSwitcherBar);
 
 		// Contextmenu for composites
 		this.toDispose.push(dom.addDisposableListener(parent, dom.EventType.CONTEXT_MENU, (e: MouseEvent) => {
@@ -412,13 +434,13 @@ export class CompositeBar implements ICompositeBar {
 		return this.pinnedComposites.indexOf(compositeId) >= 0;
 	}
 
-	public pin(compositeId: string, update = true): void {
+	public pin(compositeId: string, update = true, index = this.pinnedComposites.length): void {
 		if (this.isPinned(compositeId)) {
 			return;
 		}
 
 		this.options.openComposite(compositeId).then(() => {
-			this.pinnedComposites.push(compositeId);
+			this.pinnedComposites.splice(index, 0, compositeId);
 			this.pinnedComposites = arrays.distinct(this.pinnedComposites);
 
 			if (update) {
